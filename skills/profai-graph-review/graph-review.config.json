@@ -1,0 +1,35 @@
+{
+  "_comment": "Per-project configuration. Copy to your repo root and fill in.",
+
+  "sentinel_paths": {
+    "_comment": "Touching any of these in a diff makes Engine 2 mandatory. These are the places where 'what needs what' is declared: stage definitions, artifact requirements, routes, required fields.",
+    "paths": [
+      "path/to/pipeline_registry.py",
+      "path/to/stage_definitions.py",
+      "path/to/field_registry.py",
+      "path/to/routes/"
+    ]
+  },
+
+  "fanout": {
+    "default_reviewers": 8,
+    "second_echelon_trigger": 3,
+    "second_echelon_size": 4,
+    "_comment": "second_echelon_trigger: findings from distinct reviewers pointing at one subsystem before reinforcing it"
+  },
+
+  "engine_2": {
+    "force_after_n_slices": 5,
+    "combinatorial_tool": "pict",
+    "default_strength": 2,
+    "_comment": "strength 2 = pairwise. Escalate to 3 for dimensions where pairwise found a dead end."
+  },
+
+  "stopping": {
+    "residual_threshold": 1.0,
+    "consecutive_sweeps_below": 2
+  },
+
+  "test_command": "path/to/run_tests.sh",
+  "state_file": "graph-review-state.json"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "profai-graph-review",
+  "owner": "PROF AI",
+  "plugins": [
+    {
+      "name": "profai-graph-review",
+      "source": "./",
+      "description": "Two-engine defect hunt for agentic systems: fan-out over the diff plus reachable-state sweep."
+    }
+  ]
+}

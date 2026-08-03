@@ -1,0 +1,8 @@
+{
+  "name": "profai-graph-review",
+  "version": "1.0.0",
+  "description": "Two-engine defect hunt: fan-out reviewers over the diff, path sweep over reachable states. Agents find, the owner decides.",
+  "author": "PROF AI",
+  "license": "MIT",
+  "skills": ["skills/profai-graph-review"]
+}
