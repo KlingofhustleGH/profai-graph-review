@@ -1,35 +1,40 @@
 {
-  "_comment": "Per-project configuration. Copy to your repo root and fill in.",
+  "_comment": "TEMPLATE. Copy to your repository root and replace every REPLACE_ME value. A sweep that finds REPLACE_ME still in sentinel_paths stops and asks the owner — an unfilled sentinel list silently disables the Engine 2 trigger.",
 
   "sentinel_paths": {
-    "_comment": "Touching any of these in a diff makes Engine 2 mandatory. These are the places where 'what needs what' is declared: stage definitions, artifact requirements, routes, required fields.",
+    "_comment": "Touching any of these in a diff makes Engine 2 mandatory. These are the places where 'what needs what' is declared: stage definitions, artifact requirements, routes, required fields. Ask: if I changed this file, could a stage start requiring something new, or stop requiring something? Keep the list short — forty paths means Engine 2 runs every time, which is the same as having no rule. See references/config.md.",
     "paths": [
-      "path/to/pipeline_registry.py",
-      "path/to/stage_definitions.py",
-      "path/to/field_registry.py",
-      "path/to/routes/"
+      "REPLACE_ME/pipeline_registry.py",
+      "REPLACE_ME/stage_definitions.py",
+      "REPLACE_ME/field_registry.py",
+      "REPLACE_ME/routes/"
     ]
   },
 
   "fanout": {
+    "_comment": "Read by SKILL.md 'Engine 1' and references/engine-1-fanout.md. second_echelon_trigger: findings from distinct reviewers pointing at one subsystem before reinforcing it. Cost scales with these: see the budget section in references/engine-1-fanout.md before raising them.",
     "default_reviewers": 8,
     "second_echelon_trigger": 3,
-    "second_echelon_size": 4,
-    "_comment": "second_echelon_trigger: findings from distinct reviewers pointing at one subsystem before reinforcing it"
+    "second_echelon_size": 4
   },
 
   "engine_2": {
+    "_comment": "combinatorial_tool: 'builtin' uses scripts/covering_array.py, which ships with the skill and needs nothing installed. 'pict' and 'acts' are external and must be on PATH. default_strength 2 = pairwise; escalate to 3 for dimensions where pairwise found a dead end.",
     "force_after_n_slices": 5,
-    "combinatorial_tool": "pict",
+    "combinatorial_tool": "builtin",
     "default_strength": 2,
-    "_comment": "strength 2 = pairwise. Escalate to 3 for dimensions where pairwise found a dead end."
+    "state_model": "REPLACE_ME/engine-2-model.json"
   },
 
   "stopping": {
+    "_comment": "Gate 2. Stop when the residual estimate stays below residual_threshold for consecutive_sweeps_below sweeps in a row. Gate 1 — every class closed by an enumerating guard — has no config, because it is not negotiable.",
     "residual_threshold": 1.0,
     "consecutive_sweeps_below": 2
   },
 
-  "test_command": "path/to/run_tests.sh",
-  "state_file": "graph-review-state.json"
+  "test_command": "REPLACE_ME/run_tests.sh",
+  "_test_command_comment": "Run at the short-verification step after fixes, not during the sweep. The sweep never edits code, so it never needs to run tests.",
+
+  "state_file": "docs/DEFECTS.md",
+  "_state_file_comment": "Registry of closed classes, discarded findings, and the two counters. Must be committed — it is what stops the next sweep re-litigating decisions the owner already made. Required sections and format: references/config.md."
 }

@@ -20,8 +20,9 @@ Before dispatching, prepare three things:
    read the whole repository but judge only the slice.
 2. **Context files.** Spec, design doc, or plan for the slice. Reviewers read these
    from disk. Never pass the author's conversation.
-3. **Prior classes.** The list of defect classes already closed by guards, from
-   `graph-review-state.json`. Reviewers skip these — a guard already enumerates them.
+3. **Prior classes.** The list of defect classes already closed by guards, from the
+   `Closed` section of the state file (`state_file` in `graph-review.config.json`).
+   Reviewers skip these — a guard already enumerates them.
 
 ## Dispatch
 
@@ -67,12 +68,33 @@ returns invention rather than signal.
 
 ## Budget
 
-Eight reviewers on a medium slice: roughly an hour of wall time and on the order of
-a million tokens. Measure your own first run and calibrate — the number that
-matters is findings per unit cost, and it drops fast once charters start to overlap.
+**A sweep is not eight agents.** The reviewers are the smaller half of the bill.
+
+```
+agents per sweep = default_reviewers
+                 + second_echelon_size   (when the trigger fires)
+                 + one adversarial agent per finding
+```
+
+On the calibration slice that produced the defaults — eight reviewers, fifteen
+findings, one second echelon — that is `8 + 4 + 15 = 27` agents, over three times
+the reviewer count. The adversarial check is the largest single line item, and it
+grows with how *productive* the sweep is: a good fan-out costs more, not less.
+
+Tokens do not scale with agent count. Reviewers read broadly and are individually
+expensive; on that slice the reviewers alone ran on the order of a million tokens.
+Adversarial agents each read one claim's neighbourhood and are individually cheap,
+but there are roughly twice as many of them. Wall time was about an hour, most of
+it in the fan-out, which runs in parallel; the adversarial pass adds to it.
+
+Treat every number here as this project's measurement, not yours. **Measure your
+first run and calibrate** — the figure that matters is findings per unit cost, and
+it drops fast once charters start to overlap.
 
 If budget is tight, cut charters, not proof requirements. Six reviewers producing
-reproduced findings beat twelve producing speculation.
+reproduced findings beat twelve producing speculation. Do not cut the adversarial
+check to save money: a fan-out without it scales confident invention, and the
+findings it lets through cost more than it did.
 
 ## Common failure modes
 

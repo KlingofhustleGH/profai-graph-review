@@ -1,7 +1,7 @@
 ---
 name: profai-graph-review
 description: Two-engine defect hunt for agentic systems. Engine 1 fans out independent reviewers across the diff; Engine 2 enumerates reachable states and finds dead ends no diff review can see. Findings are classified as class or instance, deduplicated, and handed to the owner as a decision list — the skill never fixes anything on its own. Use when a work slice is code-complete, before deploy, or after a dead end escapes to production.
-license: MIT
+when_to_use: "Trigger phrases: graph review, two-engine review, defect hunt, sweep before deploy, find dead ends, reachable-state sweep, hunt bugs in this slice, review this slice before shipping; RU: граф-ревью, веер ревьюеров, прогон дефектов, найди тупики, свип перед деплоем, проверь слой перед деплоем. Expensive: a run is roughly 27 agents, not 8 — see the budget section before starting."
 ---
 
 # PROF AI Graph Review
@@ -22,6 +22,10 @@ code ───┤                                     ├── one list ── 
 Engine 1 finds bugs in what was written. Engine 2 finds bugs in what was never
 written — combinations that lead nowhere, stages demanding artifacts that cannot
 exist, instructions an agent cannot obey.
+
+> **Cost.** A sweep is roughly **27 agents**, not eight: the reviewers, the second
+> echelon, and one adversarial agent per finding. Confirm with the owner before
+> starting one. Full arithmetic: `references/engine-1-fanout.md`, budget section.
 
 ## Non-negotiables
 
@@ -58,9 +62,13 @@ author's blind spots.
 Each reviewer returns findings in the format below. Nothing else — no fixes, no
 files, no refactors.
 
-**Second echelon.** If findings cluster in one area (three or more from different
-reviewers pointing at the same subsystem), send three or four more reviewers into
-that area specifically. Width where it earns itself, not everywhere.
+**Second echelon.** If findings cluster in one area — `fanout.second_echelon_trigger`
+findings from *different* reviewers pointing at the same subsystem — send
+`fanout.second_echelon_size` more reviewers into that area specifically. Width where
+it earns itself, not everywhere.
+
+Reviewer count is `fanout.default_reviewers`. All three live in
+`graph-review.config.json`; the table above is the shape, the config is the number.
 
 Details: `references/engine-1-fanout.md`
 
@@ -81,6 +89,11 @@ Three defect shapes it catches, all invisible to diff review:
 - **No exit.** A prompt forbids a plain-text answer and mandates a tool call the
   agent cannot make in this state.
 
+The combinations come from `scripts/covering_array.py` (stdlib only, nothing to
+install) over the dimension model at `engine_2.state_model`. Running them through
+the real pipeline is a runner you write once per project — the skill ships the
+generator, not the runner, and says so rather than pretending otherwise.
+
 Details and procedure: `references/engine-2-sweep.md`
 
 ### When Engine 2 runs — decided by fact, not by memory
@@ -97,6 +110,21 @@ where stages, artifact requirements, routes, and required fields live.
 
 Engine 2 is never limited to the diff. A dead end is born in the meeting of old
 code and new state — the function that fails may not have changed in months.
+
+The slice count comes from the state file, not from anyone's memory of the last run.
+
+### What the sweep remembers
+
+Reviewers have no memory by design. Everything that must survive between sweeps
+lives in one committed file — `state_file` in `graph-review.config.json`:
+
+- **closed classes**, each with the guard that enumerates it — reviewers skip these
+- **discarded findings**, each with the owner's reason — the sweep does not
+  re-surface a decision already made
+- **two counters** — slices since Engine 2 last ran, and the last residual estimate
+
+Filling in the config, and the state file's required sections:
+`references/config.md`.
 
 ## Finding format
 
@@ -137,6 +165,9 @@ After the fan-out, one pass merges everything:
 3. Group CLASS findings, sum their instances.
 4. Sort: classes first, then by severity.
 5. Compute the residual estimate (below).
+6. Write back to the state file: the new residual, the slice counter, and any class
+   the owner closed or finding the owner discarded. A sweep that does not write back
+   makes the next one start from zero.
 
 Output: **one list for the owner.** Not diffs, not fixes, not a plan.
 

@@ -1,0 +1,16 @@
+{
+  "_comment": "Example state model for Engine 2 step 2. Replace every dimension with your own — these are the dimensions behind the dead end in the README, kept as a worked example. Dimensions are what determines WHAT EXISTS when a stage runs, not what the user typed.",
+  "strength": 2,
+  "dimensions": {
+    "mode": ["full_auto", "semi_auto"],
+    "attached_photos": ["none", "some"],
+    "content_type": ["image", "video"],
+    "photo_role": ["absent", "reference", "hero", "mixed"]
+  },
+  "forbid": [
+    { "attached_photos": "none", "photo_role": "reference" },
+    { "attached_photos": "none", "photo_role": "hero" },
+    { "attached_photos": "none", "photo_role": "mixed" },
+    { "attached_photos": "some", "photo_role": "absent" }
+  ]
+}

@@ -39,11 +39,39 @@ is the agent's job too — every row cites file:line.
 
 Take the dimensions that determine what exists: mode (auto / semi-auto), content
 type, presence or absence of each artifact kind, and the fields that gate branches.
+Write them as a model file — `engine_2.state_model` in the config points at it:
 
-Generate a covering array over these dimensions with a combinatorial tool
-(**PICT** and **ACTS** are free and support constraints; constraints matter more
-than the strength `t`, because they let you exclude impossible inputs and target
-suspicious ones).
+```json
+{
+  "strength": 2,
+  "dimensions": {
+    "mode":            ["full_auto", "semi_auto"],
+    "attached_photos": ["none", "some"],
+    "photo_role":      ["absent", "reference", "hero", "mixed"]
+  },
+  "forbid": [
+    { "attached_photos": "none", "photo_role": "reference" },
+    { "attached_photos": "some", "photo_role": "absent" }
+  ]
+}
+```
+
+Generate the covering array:
+
+```bash
+python3 scripts/covering_array.py <state_model> --strength 2
+```
+
+The shipped generator is stdlib-only and needs nothing installed
+(`engine_2.combinatorial_tool: "builtin"`). **PICT** and **ACTS** are supported
+alternatives if you already have models in their formats; set
+`combinatorial_tool` accordingly.
+
+`forbid` entries matter more than the strength `t`: they exclude states that
+cannot occur in reality, which shrinks the run count and keeps the sweep honest.
+They are not a place to hide combinations you *believe* are handled — those are
+the rows this engine exists to walk. The example above forbids a photo role
+without photos, not full-auto without photos.
 
 Why pairwise is enough to start: empirical studies across several domains found the
 large majority of failures triggered by one or two parameter values, and nearly all
@@ -59,6 +87,32 @@ For each combination record: did it reach a terminal state, or did it stop? If i
 stopped: at which stage, and what was missing.
 
 Every stop is a candidate dead end.
+
+**This step is manual work, once per project.** The skill ships the generator, not
+the runner: driving your pipeline from a row of dimension values is your entry
+points, your fixtures, your fake provider, and nothing generic can be shipped for
+it. Budget it as real engineering the first time; afterwards it is a script you
+re-run.
+
+The contract the runner must satisfy — everything downstream depends on it:
+
+| in | out |
+|----|-----|
+| one row from the covering array | `terminal` \| `stopped` |
+| | if stopped: the stage id, and what was missing |
+| | the row itself, verbatim, so the stop is reproducible |
+
+Two rules that decide whether the output is worth anything:
+
+- **No agent in the loop.** The runner is code. The moment a model decides whether
+  a combination "would work", step 3 has become step 0 with extra confidence.
+- **A stop must be reproducible from the recorded row alone.** If re-running the
+  row does not reproduce the stop, the runner carries hidden state and its
+  findings are not findings yet.
+
+Until a runner exists, Engine 2 is a reading exercise: the requirement map from
+step 1 still finds contradictions, but a dead end it reports has no PROOF field
+and therefore is not a finding under this skill's own rule.
 
 ### Step 4 — classify the stops
 

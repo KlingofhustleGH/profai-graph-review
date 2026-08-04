@@ -1,11 +1,7 @@
-# Codex agent manifest for PROF AI Graph Review
-name: profai-graph-review
-description: >-
-  Two-engine defect hunt for agentic systems. Engine 1 fans out independent
-  reviewers across the diff; Engine 2 enumerates reachable states and finds dead
-  ends no diff review can see. Findings are classified as class or instance,
-  deduplicated, and handed to the owner as a decision list. The skill never fixes
-  anything on its own.
-instructions: SKILL.md
-license: MIT
-author: PROF AI
+# Codex skill presentation metadata.
+# Schema: `interface` / `policy` / `dependencies` only — this file carries no
+# instructions. The protocol lives in SKILL.md, which Codex loads by convention.
+interface:
+  display_name: "PROF AI Graph Review"
+  short_description: "Two-engine defect hunt for agentic systems"
+  default_prompt: "Run a graph review on the slice I just finished and hand me a decision list."

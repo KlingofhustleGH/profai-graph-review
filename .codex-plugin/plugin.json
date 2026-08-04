@@ -1,8 +1,26 @@
 {
   "name": "profai-graph-review",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Two-engine defect hunt: fan-out reviewers over the diff, path sweep over reachable states. Agents find, the owner decides.",
-  "author": "PROF AI",
+  "author": {
+    "name": "PROF AI",
+    "url": "https://github.com/KlingofhustleGH"
+  },
+  "repository": "https://github.com/KlingofhustleGH/profai-graph-review",
   "license": "MIT",
-  "skills": ["skills/profai-graph-review"]
+  "keywords": ["review", "defects", "agents", "state-machine", "qa"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "PROF AI Graph Review",
+    "shortDescription": "Two-engine defect hunt for agentic systems",
+    "longDescription": "Engine 1 fans out independent reviewers with disjoint charters across the diff. Engine 2 ignores the diff and enumerates reachable states to find dead ends, retry-blind errors, and forced tool calls with no escape hatch. Findings are classified as class or instance, survive an adversarial kill attempt, and are handed to the owner as a decision list. The skill never fixes anything on its own.",
+    "developerName": "PROF AI",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive"],
+    "defaultPrompt": [
+      "Run a graph review on the slice I just finished.",
+      "Sweep reachable states for dead ends before deploy.",
+      "Hunt defects in this diff and hand me a decision list."
+    ]
+  }
 }

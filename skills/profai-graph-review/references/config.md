@@ -1,6 +1,7 @@
 # Configuration
 
-`graph-review.config.json` lives in the repository root. Two entries decide how the
+`graph-review.config.json` lives in the repository root. Copy the template from
+this skill's directory and replace every `REPLACE_ME`. Two entries decide how the
 skill behaves; the rest are defaults you can leave alone.
 
 ## sentinel_paths — the important one
@@ -28,44 +29,104 @@ inhabitants:
 Do not list the whole repository. A sentinel list of forty paths means Engine 2
 runs every time, which is the same as having no rule.
 
+The shipped values are `REPLACE_ME/...` on purpose. A sweep that finds `REPLACE_ME`
+still there stops and asks the owner: an unfilled list matches no diff, so the
+Engine 2 trigger is silently off, which is the exact failure the sentinel rule
+exists to prevent.
+
 ## state_file
 
-`graph-review-state.json` carries what the skill must remember between sweeps —
-the individual reviewers deliberately have no memory, so the state lives here:
+The state file carries what the skill must remember between sweeps. The individual
+reviewers deliberately have no memory, so it lives here and it is **committed** —
+losing it means the next sweep re-litigates every decision the owner already made.
 
-```json
-{
-  "closed_classes": [
-    {
-      "shape": "writers to shared spec state without version check",
-      "guard": "tests/guards/test_shared_state_writers.py",
-      "closed_at": "2026-08-03",
-      "instances_at_closure": 8
-    }
-  ],
-  "slices_since_engine_2": 2,
-  "last_residual": 0.4,
-  "discarded_findings": [
-    { "what": "...", "reason": "...", "decided_at": "2026-08-01" }
-  ]
-}
+**Format: markdown.** Nothing in this skill parses the state file; the only reader
+is an agent, and the state's most valuable content is the owner's reasoning — why a
+finding was discarded, what a guard actually covers. That reasoning survives in
+prose and dies in JSON string fields. Default: `docs/DEFECTS.md`.
+
+Three sections are required, in this order: **open**, **closed**, **discarded**.
+Head them in whatever language the project is written in — the roles are required,
+the English words below are not. An agent that cannot find all three stops and says
+so rather than guessing.
+
+```markdown
+# Defect registry
+
+<!-- graph-review counters -->
+slices_since_engine_2: 2
+last_residual: 0.4
+
+## Open
+- **[breaks_order] <one-line shape>** · class, 3 instances · found: <date>, <how>
+  Where: file:line, file:line
+  What breaks: <concrete scenario>
+  Owner decision: <fix now | backlog | not triaged>
+  Status: open
+
+## Closed
+- **[breaks_money] <shape>** · class, 8 instances at closure · closed: <date>
+  Guard: tests/guards/test_shared_state_writers.py
+  Status: closed
+
+## Discarded
+- **<what>** · discarded: <date> · reason: <why the owner declined it>
 ```
 
-`closed_classes` stops reviewers re-reporting shapes a guard already enumerates.
-`discarded_findings` stops the sweep re-surfacing what the owner already declined —
-without it, every sweep re-litigates the same decisions.
+`Closed` stops reviewers re-reporting shapes a guard already enumerates — a closed
+class entry without a `Guard:` line is not closed, it is unfinished. `Discarded`
+stops the sweep re-surfacing what the owner already declined.
+
+The counters block is the one machine-read part, because two rules count:
+`slices_since_engine_2` against `engine_2.force_after_n_slices`, and
+`last_residual` against `stopping.residual_threshold`. Keep both on their own line
+in that exact `key: value` shape. A missing counters block means the
+`force_after_n_slices` rule has nothing to count from and quietly never fires.
 
 ## fanout
 
 `default_reviewers: 8` is calibrated, not arbitrary: eight charters on a medium
-slice returned fifteen findings in about an hour. Raise it only if charters stop
-overlapping — more reviewers on the same territory return invention, not signal.
+slice returned fifteen findings. Raise it only if charters stop overlapping — more
+reviewers on the same territory return invention, not signal.
+
+`second_echelon_trigger: 3` — findings from that many *distinct* reviewers pointing
+at one subsystem before a second echelon is sent in. `second_echelon_size: 4` — how
+many go.
+
+Both feed the cost of a run, which is dominated by the adversarial check rather
+than by the reviewers. See the budget section in `engine-1-fanout.md` before
+raising either.
 
 ## engine_2
 
 `force_after_n_slices` guards against drift: systems change what needs what without
-anyone editing a requirement file. Five slices is a starting value.
+anyone editing a requirement file. Five slices is a starting value, counted from
+the `slices_since_engine_2` counter in the state file.
+
+`combinatorial_tool` selects the step-2 generator:
+
+- `builtin` (default) — `scripts/covering_array.py`, shipped with this skill,
+  stdlib only, nothing to install. Supports constraints and any strength.
+- `pict` / `acts` — external tools, must be on `PATH`. Use them when you already
+  have models written for one of them.
+
+`state_model` points at the dimension model the generator reads. See
+`engine-2-sweep.md` for its shape and `scripts/example-model.json` for a worked
+example.
 
 `default_strength: 2` is pairwise. Empirically the majority of interaction failures
 involve one or two parameters, most of the rest three. Escalate selectively rather
 than globally — 3-way over every dimension explodes the run count for little gain.
+
+## stopping
+
+`residual_threshold` and `consecutive_sweeps_below` are Gate 2: stop when the
+residual estimate stays below the threshold for that many sweeps in a row. Gate 1 —
+every CLASS finding closed by an enumerating guard — has no config on purpose.
+
+## test_command
+
+Run at the **short verification** step after fixes, not during the sweep. The sweep
+never edits code, so it never needs to run tests. If your project has no single
+command, put the one that covers the changed area; the point is that the owner and
+the fixing worker run the same thing.

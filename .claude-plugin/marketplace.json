@@ -1,11 +1,25 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "profai-graph-review",
-  "owner": "PROF AI",
+  "description": "Two-engine defect hunt for agentic systems.",
+  "owner": {
+    "name": "PROF AI",
+    "url": "https://github.com/KlingofhustleGH"
+  },
   "plugins": [
     {
       "name": "profai-graph-review",
       "source": "./",
-      "description": "Two-engine defect hunt for agentic systems: fan-out over the diff plus reachable-state sweep."
+      "description": "Two-engine defect hunt for agentic systems: fan-out over the diff plus reachable-state sweep.",
+      "version": "1.1.0",
+      "author": {
+        "name": "PROF AI",
+        "url": "https://github.com/KlingofhustleGH"
+      },
+      "repository": "https://github.com/KlingofhustleGH/profai-graph-review",
+      "license": "MIT",
+      "category": "code-review",
+      "keywords": ["review", "defects", "agents", "state-machine", "qa"]
     }
   ]
 }
