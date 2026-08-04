@@ -2,16 +2,26 @@
 
 A two-engine defect hunt for agentic systems.
 
-> ### ⚠️ A sweep costs about 27 agents, not 8
+> ### ⚠️ A sweep costs 7–17 agents, not 8
 >
-> Eight reviewers, up to four more in a second echelon, and **one adversarial agent
-> per finding** — the check that keeps invented findings out is the largest single
-> line item, and it grows with how productive the sweep is. On the calibration
-> slice: `8 + 4 + 15 = 27` agents, the reviewers alone on the order of a million
-> tokens, about an hour of wall time.
+> Up to eight reviewers, up to four more in a second echelon, and one adversarial
+> agent per **heavy** finding — `breaks_money` and `breaks_order` only.
 >
-> Do not start one casually, and do not cut the adversarial check to save money.
-> Full arithmetic in [engine-1-fanout.md](skills/profai-graph-review/references/engine-1-fanout.md#budget).
+> Two rules keep that from being a flat fee. **A charter with no territory in the
+> slice is not dispatched** — handed a job and no material, an agent invents rather
+> than reporting nothing. And **lighter findings are not refuted during the sweep**;
+> they reach the list marked `NOT REFUTED`, because nothing below `breaks_order`
+> becomes a code change without a separate decision from the owner, so a false one
+> costs nothing until then. If the owner does pull one into the work, it is refuted
+> before the fix is planned — the check is deferred, not waived.
+>
+> Wide slice, all charters earning their place: `8 + 4 + 5 = 17`, the reviewers
+> alone on the order of a million tokens, about an hour of wall time. Narrow slice:
+> around `5 + 0 + 2 = 7`. Refuting every finding regardless of severity would have
+> cost 27.
+>
+> Full arithmetic in
+> [engine-1-fanout.md](skills/profai-graph-review/references/engine-1-fanout.md#budget).
 
 Most defect-hunting skills loop one reviewer over a diff until it stops
 complaining. That converges on style and misses whole categories of defect — most
@@ -34,6 +44,18 @@ reasoning inherits the author's blind spots.
 reachable state exists where the stage runs and the requirement is absent. This
 catches dead ends, retry-blind errors, and forced tool calls with no escape hatch —
 none of which a diff review can see.
+
+> **Engine 2 runs out of the box, except for one file you write.** The skill ships
+> the generator and the driver: combinations, execution, re-run of every stop to
+> prove it reproduces, and classification into the four defect shapes. What it
+> cannot ship is the adapter — the ~30 lines that drive *your* pipeline for one
+> combination, with your entry points and your fake provider.
+> [`adapter_template.py`](skills/profai-graph-review/scripts/adapter_template.py) is
+> the contract;
+> [`example_adapter.py`](skills/profai-graph-review/scripts/example_adapter.py) is a
+> working one over a toy pipeline, so you can watch the machinery find the dead end
+> from this README before writing yours. Until your adapter exists, Engine 2 gives
+> you combinations, not findings — a combination nobody executed has no PROOF.
 
 ## Why it exists
 
@@ -59,7 +81,7 @@ exists for them.
 | fixes | applied inside the loop | owner decides, one worker applies |
 | repeated defects | fixed one at a time | class → enumerating guard, closed at once |
 | stopping | reviewer's score | residual estimate from reviewer overlap |
-| findings | as reported | survive an adversarial kill attempt first |
+| findings | as reported | heavy ones survive an adversarial kill attempt first |
 
 Written from production experience — and, until 1.1.0, never once installed: the
 manifests were written from memory of the plugin schema instead of from the schema.
@@ -68,6 +90,13 @@ what someone ran.
 
 ## Install
 
+> **1.3.0 — Engine 2 ships a working driver; empty charters are not dispatched.**
+> A sweep now costs 7–17 agents depending on the slice. Config: `default_reviewers`
+> is now `max_reviewers`, plus `min_reviewers` and `engine_2.adapter`.
+>
+> **1.2.0 — the adversarial check is gated by severity: a sweep costs ~17 agents,
+> not 27.**
+>
 > **1.1.0 — installation manifests fixed, Engine 2 ships its generator.** If you
 > tried 1.0.0 and `marketplace add` failed on the first command, that was not your
 > mistake: both manifests were invalid and the skill could not install for anyone.
@@ -143,8 +172,10 @@ See [references/config.md](skills/profai-graph-review/references/config.md).
 1. **Agents find, the owner decides, one worker fixes.** Parallel fixers overwrite
    each other, and a fix made under the pressure of a running loop is a common
    defect source.
-2. **A finding without reproduction is not a finding.** Agreement between agents is
-   not evidence — a dozen agents will confirm a bug that does not exist.
+2. **No fix is planned on a finding nobody tried to kill.** Heavy findings are
+   refuted before they reach the list; lighter ones when the owner pulls them into
+   the work. Agreement between agents is not evidence — a dozen agents will confirm
+   a bug that does not exist.
 3. **A class is never fixed one instance at a time.** More than one instance means
    the fix is an enumerating guard.
 4. **Stop on residual estimate, not on a score.** A "9.5/10" measures the
@@ -162,7 +193,10 @@ skills/profai-graph-review/
 ├── graph-review.config.json      per-project settings — template, copy to repo root
 ├── agents/openai.yaml            Codex presentation metadata (name, icon; no logic)
 ├── scripts/
-│   ├── covering_array.py         Engine 2 step 2 — covering arrays, stdlib only
+│   ├── sweep.py                  Engine 2 driver — run, re-run, classify. Stdlib only
+│   ├── covering_array.py         Engine 2 step 2 — covering arrays, constraints
+│   ├── adapter_template.py       the one file you write per project
+│   ├── example_adapter.py        a working adapter over a toy pipeline
 │   └── example-model.json        worked dimension model
 └── references/
     ├── engine-1-fanout.md        charters, dispatch, echelons, budget, failure modes
@@ -172,9 +206,15 @@ skills/profai-graph-review/
     └── config.md                 every config key, and the state file's format
 ```
 
-Engine 2 ships its generator, not its runner: driving your pipeline from a row of
-dimension values is your entry points and your fixtures, and that part is work you
-do once per project. `engine-2-sweep.md` states the contract it must satisfy.
+Try Engine 2 before wiring it to anything:
+
+```bash
+cd skills/profai-graph-review/scripts
+python3 sweep.py --model example-model.json --adapter ./example_adapter.py
+```
+
+It finds the dead end and the retry-blind error from the top of this README, tells
+them apart from the legitimate stop, and exits non-zero. Then write your adapter.
 
 ## Credits
 

@@ -79,53 +79,73 @@ by three. Escalate to 3-way for the dimensions where pairwise found a dead end.
 
 ### Step 3 — execute, don't reason
 
-Run each generated combination through the **real pipeline** with a fake provider.
-Do not ask an agent whether a combination works — agents are fluent and will tell
-you a plausible story. Machines do not invent.
+Run each generated combination through the **real pipeline** with a fake provider,
+and record what happened: did it reach a terminal state, or did it stop, and if it
+stopped, at which stage and what was missing. Every stop is a candidate dead end.
 
-For each combination record: did it reach a terminal state, or did it stop? If it
-stopped: at which stage, and what was missing.
+The driver ships:
 
-Every stop is a candidate dead end.
+```bash
+python3 scripts/sweep.py --model <state_model> --adapter <adapter> --out stops.json
+```
 
-**This step is manual work, once per project.** The skill ships the generator, not
-the runner: driving your pipeline from a row of dimension values is your entry
-points, your fixtures, your fake provider, and nothing generic can be shipped for
-it. Budget it as real engineering the first time; afterwards it is a script you
-re-run.
+It generates the rows, runs each one, re-runs every stop, classifies, prints, and
+exits non-zero if any defect shape survives. What it cannot know is how to start
+*your* pipeline — that is the adapter, and it is the only part you write:
 
-The contract the runner must satisfy — everything downstream depends on it:
+```python
+def run(row):
+    """One combination in, where it got to out."""
+    return {"outcome": "terminal"}
+    # or {"outcome": "stopped", "stage": "reference_card",
+    #     "missing": "...", "system_can_ask": False, "error_is_retryable": False}
+```
 
-| in | out |
-|----|-----|
-| one row from the covering array | `terminal` \| `stopped` |
-| | if stopped: the stage id, and what was missing |
-| | the row itself, verbatim, so the stop is reproducible |
+Full contract with every field: `scripts/adapter_template.py`. A working example
+over a toy pipeline: `scripts/example_adapter.py` — run it before writing yours,
+it finds the two defects from the top of this file.
 
-Two rules that decide whether the output is worth anything:
+Three rules the adapter must obey, because they are what makes the output evidence:
 
-- **No agent in the loop.** The runner is code. The moment a model decides whether
+- **Drive the real pipeline.** Same entry points production uses. A reimplementation
+  of the logic inside the adapter tests the adapter.
+- **No agent in the loop.** The adapter is code. The moment a model decides whether
   a combination "would work", step 3 has become step 0 with extra confidence.
-- **A stop must be reproducible from the recorded row alone.** If re-running the
-  row does not reproduce the stop, the runner carries hidden state and its
-  findings are not findings yet.
+- **No state between rows.** `scripts/sweep.py` re-runs every stop and marks it
+  `not_reproducible` when the two runs disagree, so leaked state cannot be mistaken
+  for a finding. Fix the leak; do not read past it.
 
-Until a runner exists, Engine 2 is a reading exercise: the requirement map from
-step 1 still finds contradictions, but a dead end it reports has no PROOF field
-and therefore is not a finding under this skill's own rule.
+Until your adapter exists, Engine 2 is a reading exercise: the requirement map from
+step 1 still finds contradictions, but a dead end it reports has no PROOF field and
+therefore is not a finding under this skill's own rule.
 
 ### Step 4 — classify the stops
 
-- **Legitimate stop.** The system correctly asked the client for something. Not a
-  defect.
+`scripts/sweep.py` does this by rule, from what the adapter reported. It is not an agent's
+judgement call:
+
+| Bucket | Rule | Defect |
+|---|---|---|
+| **No exit** | `forced_tool_without_escape` | yes |
+| **Retry-blind error** | `error_is_retryable` absent or `None` | yes |
+| **Legitimate stop** | `system_can_ask` is true and neither of the above | no |
+| **Dead end** | everything else that stopped | yes |
+| **Not reproducible** | the re-run disagreed | fix the runner first |
+
+Defect shapes are checked before legitimacy on purpose: a stage that asks the client
+*and* reports an unretryable error as retryable is still burning the caller's budget.
+
+What each one means:
+
+- **Legitimate stop.** The system correctly asked the client for something.
 - **Dead end.** The stage cannot proceed and the system cannot ask, or asking would
-  not help. Defect, severity `breaks_order` at minimum.
-- **Retry-blind error.** The stop reports an error whose shape does not distinguish
-  "retry might help" from "impossible forever". Defect — the caller will burn its
-  budget. Fix shape: every validation error declares retryability explicitly.
+  not help. Severity `breaks_order` at minimum.
+- **Retry-blind error.** The error shape does not distinguish "retry might help"
+  from "impossible forever". The caller burns its budget against a wall. Fix shape:
+  every validation error declares retryability explicitly.
 - **No exit.** An agent is required to call a tool it cannot call, and forbidden
-  from answering in text. Defect. Fix shape: wherever a tool call is forced, an
-  escape hatch must exist ("cannot do this, here is why").
+  from answering in text. Fix shape: wherever a tool call is forced, an escape hatch
+  must exist ("cannot do this, here is why").
 
 The last three are classes, not instances, almost always. Check the whole tree.
 

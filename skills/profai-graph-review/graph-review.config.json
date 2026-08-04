@@ -12,8 +12,9 @@
   },
 
   "fanout": {
-    "_comment": "Read by SKILL.md 'Engine 1' and references/engine-1-fanout.md. second_echelon_trigger: findings from distinct reviewers pointing at one subsystem before reinforcing it. Cost scales with these: see the budget section in references/engine-1-fanout.md before raising them.",
-    "default_reviewers": 8,
+    "_comment": "max_reviewers is a ceiling, not a quota: a charter with no territory in this slice is not dispatched, because it returns invention rather than nothing. min_reviewers is the floor below which the residual estimate stops meaning anything. second_echelon_trigger: findings from distinct reviewers pointing at one subsystem before reinforcing it. Cost scales with all of these — see the budget section in references/engine-1-fanout.md.",
+    "max_reviewers": 8,
+    "min_reviewers": 3,
     "second_echelon_trigger": 3,
     "second_echelon_size": 4
   },
@@ -23,7 +24,8 @@
     "force_after_n_slices": 5,
     "combinatorial_tool": "builtin",
     "default_strength": 2,
-    "state_model": "REPLACE_ME/engine-2-model.json"
+    "state_model": "REPLACE_ME/engine-2-model.json",
+    "adapter": "REPLACE_ME/engine2_adapter.py"
   },
 
   "stopping": {

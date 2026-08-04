@@ -1,7 +1,7 @@
 ---
 name: profai-graph-review
 description: Two-engine defect hunt for agentic systems. Engine 1 fans out independent reviewers across the diff; Engine 2 enumerates reachable states and finds dead ends no diff review can see. Findings are classified as class or instance, deduplicated, and handed to the owner as a decision list — the skill never fixes anything on its own. Use when a work slice is code-complete, before deploy, or after a dead end escapes to production.
-when_to_use: "Trigger phrases: graph review, two-engine review, defect hunt, sweep before deploy, find dead ends, reachable-state sweep, hunt bugs in this slice, review this slice before shipping; RU: граф-ревью, веер ревьюеров, прогон дефектов, найди тупики, свип перед деплоем, проверь слой перед деплоем. Expensive: a run is roughly 27 agents, not 8 — see the budget section before starting."
+when_to_use: "Trigger phrases: graph review, two-engine review, defect hunt, sweep before deploy, find dead ends, reachable-state sweep, hunt bugs in this slice, review this slice before shipping; RU: граф-ревью, веер ревьюеров, прогон дефектов, найди тупики, свип перед деплоем, проверь слой перед деплоем. Expensive: a run is 7-17 agents, not 8 — see the budget section before starting."
 ---
 
 # PROF AI Graph Review
@@ -23,18 +23,22 @@ Engine 1 finds bugs in what was written. Engine 2 finds bugs in what was never
 written — combinations that lead nowhere, stages demanding artifacts that cannot
 exist, instructions an agent cannot obey.
 
-> **Cost.** A sweep is roughly **27 agents**, not eight: the reviewers, the second
-> echelon, and one adversarial agent per finding. Confirm with the owner before
-> starting one. Full arithmetic: `references/engine-1-fanout.md`, budget section.
+> **Cost.** A sweep is **7–17 agents**, not eight: the charters that have territory
+> in this slice, the second echelon if density earns it, and one adversarial agent
+> per *heavy* finding — `breaks_money` and `breaks_order` only. Confirm with the
+> owner before starting one. Full arithmetic: `references/engine-1-fanout.md`,
+> budget section.
 
 ## Non-negotiables
 
 1. **Agents find. The owner decides. One worker fixes.** No agent edits code during
    a sweep. Parallel fixers overwrite each other, and a fix made under the pressure
    of a running loop is itself a common defect source.
-2. **A finding without reproduction is not a finding.** Every finding passes an
-   adversarial check that tries to kill it. Agreement between agents is not
-   evidence — a dozen agents will happily confirm a bug that does not exist.
+2. **No fix is planned on a finding nobody tried to kill.** Every finding heavy
+   enough to move a worker — `breaks_money`, `breaks_order` — passes an adversarial
+   check before it reaches the list; lighter ones pass it if and when the owner
+   pulls them into the work. Agreement between agents is not evidence — a dozen
+   agents will happily confirm a bug that does not exist.
 3. **A class is never fixed one instance at a time.** If the same defect shape
    exists in more than one place, the fix is an enumerating guard, not N patches.
 4. **Stop on residual estimate, not on a score.** A reviewer's "9.5/10" measures
@@ -42,8 +46,8 @@ exist, instructions an agent cannot obey.
 
 ## Engine 1 — fan-out over the diff
 
-Eight independent reviewers, each with a fresh context and a narrow charter. Fresh
-context is the point: a reviewer who saw the author's reasoning inherits the
+Up to eight independent reviewers, each with a fresh context and a narrow charter.
+Fresh context is the point: a reviewer who saw the author's reasoning inherits the
 author's blind spots.
 
 **Default charters.** Adapt names to the project, keep the shapes:
@@ -62,13 +66,21 @@ author's blind spots.
 Each reviewer returns findings in the format below. Nothing else — no fixes, no
 files, no refactors.
 
+**A charter with no territory is not dispatched.** Before sending the fan-out, check
+each charter against the slice: does the diff contain anything this charter could
+judge? A slice that touches no payment path has nothing for the money charter. Send
+it anyway and it does not return "nothing found" — it returns invention, because an
+agent given a job and no material will find something. `fanout.max_reviewers` is a
+ceiling, not a quota; `fanout.min_reviewers` is the floor below which the residual
+estimate stops meaning anything.
+
 **Second echelon.** If findings cluster in one area — `fanout.second_echelon_trigger`
 findings from *different* reviewers pointing at the same subsystem — send
 `fanout.second_echelon_size` more reviewers into that area specifically. Width where
 it earns itself, not everywhere.
 
-Reviewer count is `fanout.default_reviewers`. All three live in
-`graph-review.config.json`; the table above is the shape, the config is the number.
+All four numbers live in `graph-review.config.json`; the table above is the shape,
+the config is the bound, the slice is the actual count.
 
 Details: `references/engine-1-fanout.md`
 
@@ -89,10 +101,20 @@ Three defect shapes it catches, all invisible to diff review:
 - **No exit.** A prompt forbids a plain-text answer and mandates a tool call the
   agent cannot make in this state.
 
-The combinations come from `scripts/covering_array.py` (stdlib only, nothing to
-install) over the dimension model at `engine_2.state_model`. Running them through
-the real pipeline is a runner you write once per project — the skill ships the
-generator, not the runner, and says so rather than pretending otherwise.
+Engine 2 is a script, not a reading exercise:
+
+```bash
+python3 scripts/sweep.py --model <engine_2.state_model> --adapter <engine_2.adapter>
+```
+
+`scripts/sweep.py` generates the combinations, runs each one, **re-runs every stop** and
+fails it if the two runs disagree, classifies what is left into the four shapes
+above, and exits non-zero when it finds one. Stdlib only.
+
+The one thing it cannot ship is the adapter — the ~30 lines that drive *your*
+pipeline for one combination. `scripts/adapter_template.py` is the contract;
+`scripts/example_adapter.py` is a working one you can run today. Until yours
+exists, Engine 2 produces combinations, not findings.
 
 Details and procedure: `references/engine-2-sweep.md`
 
@@ -137,6 +159,7 @@ WHAT BREAKS  the concrete scenario, not "may cause issues"
 PROOF        code quote or reproduction. No proof, no finding.
 SHAPE        CLASS (N instances, listed) | INSTANCE
 SEVERITY     breaks_money | breaks_order | degrades_experience | cosmetic
+CHECKED      refuted-and-survived | NOT REFUTED (severity below breaks_order)
 ```
 
 **SHAPE is the field that decides the fix.** An agent claiming CLASS must list the
@@ -151,16 +174,34 @@ Severity ladder, in the owner's terms:
 
 ## Adversarial check
 
-Before a finding reaches the list, a separate agent tries to **kill** it: reproduce
-the claim, and if it cannot, argue why the finding is wrong. Survivors are
-promoted. This exists because agents are optimised for plausibility, and a fan-out
-without this step scales confident invention.
+A separate agent tries to **kill** a finding: reproduce the claim, and if it cannot,
+argue why the finding is wrong. Survivors are promoted. This exists because agents
+are optimised for plausibility, and a fan-out without this step scales confident
+invention.
+
+**Severity decides who gets checked.** The check costs an agent, and a false
+finding costs whatever acting on it would cost:
+
+| Severity | Adversarial check |
+|---|---|
+| `breaks_money`, `breaks_order` | **required** — a wrong one sends a worker into the code |
+| `degrades_experience`, `cosmetic` | **skipped** — reaches the list marked `NOT REFUTED` |
+
+Nothing below `breaks_order` turns into a code change without the owner deciding
+so separately, and a false cosmetic finding costs nothing until then. Spending an
+agent to disprove it buys nothing.
+
+**The check is deferred, not waived.** A `NOT REFUTED` finding that the owner later
+pulls into the work goes through the adversarial check *before* the fix is planned.
+The gate moves to the moment it starts to matter; it does not disappear. A fix
+planned on an unrefuted finding is the failure this rule exists to prevent.
 
 ## Consolidation
 
 After the fan-out, one pass merges everything:
 
-1. Drop findings that failed the adversarial check.
+1. Drop findings that failed the adversarial check. Findings that skipped it by
+   severity stay, carrying `NOT REFUTED`.
 2. Merge duplicates — different reviewers describe the same defect differently.
 3. Group CLASS findings, sum their instances.
 4. Sort: classes first, then by severity.
@@ -210,6 +251,7 @@ The recommended flow around it:
 
 ```
 build slice → PROF AI Graph Review → owner triages the list
+  → any NOT REFUTED finding pulled into the work is refuted first
   → strong model writes a fix plan → owner approves
   → worker model applies → short verification → live acceptance
 ```
@@ -227,6 +269,7 @@ The consolidated list is titled:
 PROF AI Graph Review — <slice name>
 Engine 1: N reviewers, F findings (C classes / I instances)
 Engine 2: run | skipped (reason)
+Refuted: H heavy findings checked, L listed NOT REFUTED
 Residual estimate: X
 ```
 

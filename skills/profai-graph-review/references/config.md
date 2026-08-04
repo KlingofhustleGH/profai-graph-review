@@ -85,17 +85,23 @@ in that exact `key: value` shape. A missing counters block means the
 
 ## fanout
 
-`default_reviewers: 8` is calibrated, not arbitrary: eight charters on a medium
-slice returned fifteen findings. Raise it only if charters stop overlapping — more
-reviewers on the same territory return invention, not signal.
+`max_reviewers: 8` is a **ceiling**, not a quota. Eight charters on a medium slice
+returned fifteen findings, which is where the number comes from — but a charter with
+no territory in the slice is not dispatched at all, so the actual count is whatever
+the slice earns. Raise the ceiling only if charters stop overlapping; more reviewers
+on the same territory return invention, not signal.
+
+`min_reviewers: 3` is the floor. Below three or four the residual estimate has
+almost no overlap to work from and stops carrying information — you would be saving
+two agents by giving up the stopping criterion.
 
 `second_echelon_trigger: 3` — findings from that many *distinct* reviewers pointing
 at one subsystem before a second echelon is sent in. `second_echelon_size: 4` — how
 many go.
 
-Both feed the cost of a run, which is dominated by the adversarial check rather
-than by the reviewers. See the budget section in `engine-1-fanout.md` before
-raising either.
+Both feed the cost of a run directly: reviewers are the largest line item, and the
+adversarial check adds one more agent per *heavy* finding on top. See the budget
+section in `engine-1-fanout.md` before raising either.
 
 ## engine_2
 
@@ -113,6 +119,11 @@ the `slices_since_engine_2` counter in the state file.
 `state_model` points at the dimension model the generator reads. See
 `engine-2-sweep.md` for its shape and `scripts/example-model.json` for a worked
 example.
+
+`adapter` points at the one file you write: the ~30 lines that drive your pipeline
+for one combination. `scripts/adapter_template.py` is the contract,
+`scripts/example_adapter.py` a working one. Both keys must be real before Engine 2
+produces findings rather than a list of combinations.
 
 `default_strength: 2` is pairwise. Empirically the majority of interaction failures
 involve one or two parameters, most of the rest three. Escalate selectively rather

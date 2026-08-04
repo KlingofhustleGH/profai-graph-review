@@ -59,7 +59,8 @@ A full sweep is for new code. Fixes get verification, not a hunt.
 - **Sweep (Engine 1 reviewers):** cheap and fast. Reviewers read and report; the
   work is breadth, not depth.
 - **Adversarial check:** stronger. Killing a finding requires reasoning about why
-  something cannot happen — the harder direction.
+  something cannot happen — the harder direction. Runs on heavy findings during the
+  sweep, and on a lighter one at the moment the owner pulls it into the work.
 - **Fix planning:** strongest available. This is where architecture decisions hide.
 - **Applying fixes:** cheap. The plan carries the thinking.
 
