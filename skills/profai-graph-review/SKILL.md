@@ -29,6 +29,26 @@ exist, instructions an agent cannot obey.
 > owner before starting one. Full arithmetic: `references/engine-1-fanout.md`,
 > budget section.
 
+## Before anything: is this project set up?
+
+First action of every sweep, before dispatching a single agent. Read
+`graph-review.config.json` at the repository root and check:
+
+| State | Do |
+|---|---|
+| No config file | **STOP.** Tell the owner the project is not set up, offer to run setup. |
+| `REPLACE_ME` anywhere in it | **STOP.** Name the keys. An unfilled `sentinel_paths` matches no diff, so the Engine 2 trigger is silently off. |
+| A `sentinel_paths` entry does not exist on disk | **STOP.** A typo here fails open, not closed. |
+| `state_file` missing or unreadable | **STOP.** Without it the sweep re-litigates decisions the owner already made. |
+| Engine 2 keys point at files that do not exist | Engine 1 may run. Report Engine 2 as **not set up**, never as "skipped". |
+
+Never invent sentinel paths, a state file, or a model to get moving. Every one of
+these failures is silent by construction — the sweep still produces a confident
+report, and the owner cannot tell it from a real one.
+
+Setting a project up is `references/setup.md`. It is a one-time job, done cold,
+not during a review.
+
 ## Non-negotiables
 
 1. **Agents find. The owner decides. One worker fixes.** No agent edits code during

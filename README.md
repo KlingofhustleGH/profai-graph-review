@@ -90,6 +90,11 @@ what someone ran.
 
 ## Install
 
+> **1.4.0 — setup is documented and gated.** A sweep now stops if the project is
+> not configured instead of improvising. `references/setup.md` was written by
+> walking the setup end to end on a production codebase; its traps section is what
+> actually went wrong.
+>
 > **1.3.0 — Engine 2 ships a working driver; empty charters are not dispatched.**
 > A sweep now costs 7–17 agents depending on the slice. Config: `default_reviewers`
 > is now `max_reviewers`, plus `min_reviewers` and `engine_2.adapter`.
@@ -146,26 +151,47 @@ symlink above is the supported Codex path.
 
 ## Setup
 
-Copy the config template to your repository root:
+The skill is not usable out of the box, and it stops rather than guessing: a sweep
+whose first check finds no config refuses to run. Setup is a one-time job, done
+cold — not at the moment someone wants a review, because that is when it gets
+skipped.
+
+**The short version:** ask Claude Code to do it.
+
+```
+/profai-graph-review:profai-graph-review set this project up
+```
+
+It follows [references/setup.md](skills/profai-graph-review/references/setup.md),
+which is written for exactly that: what to produce, how to choose sentinel paths,
+how to find the right entry point for the Engine 2 adapter, and the four traps that
+a real setup on a production codebase hit before it produced an honest number.
+
+**By hand**, copy the config template to your repository root:
 
 ```bash
+# installed as a plugin
+cp "$(ls -d ~/.claude/plugins/cache/profai-graph-review/profai-graph-review/*/skills/profai-graph-review | tail -1)/graph-review.config.json" ./graph-review.config.json
+
+# installed by symlink, from your clone
 cp skills/profai-graph-review/graph-review.config.json ./graph-review.config.json
 ```
 
-Then replace every `REPLACE_ME`. The one that matters is `sentinel_paths` — the
-files where stages, artifact requirements, routes, and required fields are
-declared.
+Then replace every `REPLACE_ME`. Two keys carry the weight:
 
-That list drives one rule: **a diff touching a sentinel path makes Engine 2
-mandatory.** Left as `REPLACE_ME` it matches nothing, the trigger silently never
-fires, and the path sweep quietly stops running — which is the exact failure the
-rule exists to prevent.
+`sentinel_paths` — the files where stages, artifact requirements, routes, and
+required fields are declared. They drive one rule: **a diff touching a sentinel
+path makes Engine 2 mandatory.** Left as `REPLACE_ME` the list matches nothing, the
+trigger silently never fires, and the path sweep quietly stops running — the exact
+failure the rule exists to prevent.
 
-Also set `state_file`: the committed registry of closed classes, discarded
-findings, and two counters. Without it every sweep re-litigates decisions the owner
-already made.
+`state_file` — the committed registry of closed classes, discarded findings, and
+two counters. Without it every sweep re-litigates decisions the owner already made.
 
-See [references/config.md](skills/profai-graph-review/references/config.md).
+Engine 2 needs two more files, both project-specific: a dimension model and a ~30
+line adapter. [setup.md](skills/profai-graph-review/references/setup.md) covers
+both; every key is documented in
+[config.md](skills/profai-graph-review/references/config.md).
 
 ## The four non-negotiables
 
@@ -199,6 +225,7 @@ skills/profai-graph-review/
 │   ├── example_adapter.py        a working adapter over a toy pipeline
 │   └── example-model.json        worked dimension model
 └── references/
+    ├── setup.md                  configuring the skill for a project, and its traps
     ├── engine-1-fanout.md        charters, dispatch, echelons, budget, failure modes
     ├── engine-2-sweep.md         requirement map, combinations, dead-end classes
     ├── stopping.md               guards and the residual estimate

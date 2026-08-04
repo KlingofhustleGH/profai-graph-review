@@ -11,7 +11,7 @@
       "name": "profai-graph-review",
       "source": "./",
       "description": "Two-engine defect hunt for agentic systems: fan-out over the diff plus reachable-state sweep.",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "author": {
         "name": "PROF AI",
         "url": "https://github.com/KlingofhustleGH"
